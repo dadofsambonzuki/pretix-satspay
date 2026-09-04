@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from i18nfield.forms import I18nFormField, I18nTextInput
 from i18nfield.strings import LazyI18nString
 
+from pretix.base.forms import SecretKeySettingsField
 from pretix.base.models import OrderPayment
 from pretix.base.payment import BasePaymentProvider, PaymentException
 from pretix.multidomain.urlreverse import build_absolute_uri, eventreverse
@@ -59,13 +60,12 @@ class Satspay(BasePaymentProvider):
                 ),
                 (
                     "api_key",
-                    forms.CharField(
+                    SecretKeySettingsField(
                         label=_("Satspay API key"),
                         help_text=_(
                             "The invoice key of the LNbits wallet that has the "
                             "Satspay extension enabled."
                         ),
-                        widget=forms.PasswordInput,
                     ),
                 ),
                 (
