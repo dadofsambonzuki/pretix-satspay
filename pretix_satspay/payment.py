@@ -217,9 +217,17 @@ class Satspay(BasePaymentProvider):
                     "in touch with us if this problem persists."
                 )
             )
+        # ``charge["amount"]`` from Satspay is in satoshis, while pretix's
+        # ``payment.amount`` (and any other ``amount`` field we store) is in the
+        # event currency (here GBP). Keep them distinguishable: store the sats
+        # figure under a clearly-named key and mirror the fiat value under
+        # ``amount`` so naive consumers of ``info_data`` never mistake sats for
+        # the event currency.
         payment.info_data = {
             "charge_id": charge["id"],
-            "amount": charge.get("amount"),
+            "amount_sats": charge.get("amount"),
+            "amount": charge.get("currency_amount") or float(payment.amount),
+            "currency": charge.get("currency") or self.event.currency,
         }
         payment.save(update_fields=["info"])
         payment.order.log_action(
@@ -301,6 +309,9 @@ class Satspay(BasePaymentProvider):
     def api_payment_details(self, payment: OrderPayment) -> dict:
         return {
             "charge_id": payment.info_data.get("charge_id"),
+            "amount_sats": payment.info_data.get("amount_sats"),
+            "amount": payment.info_data.get("amount") or float(payment.amount),
+            "currency": payment.info_data.get("currency") or self.event.currency,
         }
 
     def payment_refund_supported(self, payment: OrderPayment) -> bool:
