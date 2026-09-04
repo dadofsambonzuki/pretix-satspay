@@ -2,7 +2,7 @@ from setuptools import find_namespace_packages, setup
 
 setup(
     name="pretix-satspay",
-    version="0.1.0",
+    version="0.1.1",
     description="Accept Bitcoin payments in pretix via the LNbits Satspay extension",
     long_description="""# pretix Satspay
 
