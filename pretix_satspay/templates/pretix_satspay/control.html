@@ -5,7 +5,7 @@
         <dd>{{ charge_id }}</dd>
         {% if status %}
             <dt>{% trans "Amount" %}</dt>
-            <dd>{{ status.amount }} sats</dd>
+            <dd>{% firstof payment.info_data.amount_sats status.amount %} sats</dd>
             <dt>{% trans "Paid" %}</dt>
             <dd>{% if status.paid %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</dd>
         {% endif %}

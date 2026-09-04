@@ -163,7 +163,23 @@ class Satspay(BasePaymentProvider):
     def checkout_prepare(self, request, cart) -> bool:
         return True
 
-    def execute_payment(self, request, payment: OrderPayment):
+    def _charge(self, payment: OrderPayment):
+        """
+        Return the charge_id currently stored on the payment, creating a new
+        charge on demand if none exists yet.
+
+        pretix sends the order-placed (and payment reminder) emails before it
+        calls ``execute_payment``, so at email render time the payment has not
+        had a charge created for it yet. Creating it lazily here guarantees the
+        payment link embedded in those emails is always valid instead of
+        degrading to a broken ``/satspay/None`` URL.
+        """
+        charge_id = payment.info_data.get("charge_id")
+        if charge_id:
+            return charge_id
+        return self._create_charge(payment)
+
+    def _create_charge(self, payment: OrderPayment):
         webhook_url = build_absolute_uri(
             self.event,
             "plugins:pretix_satspay:webhook",
@@ -201,33 +217,63 @@ class Satspay(BasePaymentProvider):
                     "in touch with us if this problem persists."
                 )
             )
+        # ``charge["amount"]`` from Satspay is in satoshis, while pretix's
+        # ``payment.amount`` (and any other ``amount`` field we store) is in the
+        # event currency (here GBP). Keep them distinguishable: store the sats
+        # figure under a clearly-named key and mirror the fiat value under
+        # ``amount`` so naive consumers of ``info_data`` never mistake sats for
+        # the event currency.
         payment.info_data = {
             "charge_id": charge["id"],
-            "amount": charge.get("amount"),
+            "amount_sats": charge.get("amount"),
+            "amount": charge.get("currency_amount") or float(payment.amount),
+            "currency": charge.get("currency") or self.event.currency,
         }
         payment.save(update_fields=["info"])
         payment.order.log_action(
             "pretix_satspay.charge.created",
             data={"charge_id": charge["id"]},
         )
-        return self.client.charge_page_url(charge["id"])
+        return charge["id"]
+
+    def execute_payment(self, request, payment: OrderPayment):
+        charge_id = self._charge(payment)
+        return self.client.charge_page_url(charge_id)
 
     def payment_pending_render(self, request, payment: OrderPayment) -> str:
         template = get_template("pretix_satspay/pending.html")
-        charge_id = payment.info_data.get("charge_id")
         ctx = {
             "request": request,
             "event": self.event,
             "settings": self.settings,
             "order": payment.order,
             "payment": payment,
-            "charge_link": self.client.charge_page_url(charge_id),
-            "status_url": self.client.charge_public_status_url(charge_id),
         }
+        if payment.state in (
+            OrderPayment.PAYMENT_STATE_CREATED,
+            OrderPayment.PAYMENT_STATE_PENDING,
+        ):
+            try:
+                charge_id = self._charge(payment)
+            except PaymentException:
+                charge_id = payment.info_data.get("charge_id")
+            ctx["charge_link"] = self.client.charge_page_url(charge_id) if charge_id else None
+            ctx["status_url"] = self.client.charge_public_status_url(charge_id) if charge_id else None
+        else:
+            ctx["charge_link"] = None
+            ctx["status_url"] = None
         return template.render(ctx)
 
     def order_pending_mail_render(self, order, payment: OrderPayment) -> str:
-        charge_id = payment.info_data.get("charge_id")
+        try:
+            charge_id = self._charge(payment)
+        except PaymentException:
+            charge_id = payment.info_data.get("charge_id")
+        if not charge_id:
+            return _(
+                "Your Bitcoin / Lightning payment is still being prepared. "
+                "Please return to your order and choose how to pay."
+            )
         return _("To pay for your order, please visit the following page: {url}").format(
             url=self.client.charge_page_url(charge_id)
         )
@@ -263,6 +309,9 @@ class Satspay(BasePaymentProvider):
     def api_payment_details(self, payment: OrderPayment) -> dict:
         return {
             "charge_id": payment.info_data.get("charge_id"),
+            "amount_sats": payment.info_data.get("amount_sats"),
+            "amount": payment.info_data.get("amount") or float(payment.amount),
+            "currency": payment.info_data.get("currency") or self.event.currency,
         }
 
     def payment_refund_supported(self, payment: OrderPayment) -> bool:
