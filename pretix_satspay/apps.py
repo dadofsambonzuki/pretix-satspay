@@ -9,3 +9,6 @@ class SatspayAppConfig(PluginConfig):
     default = True
 
     PretixPluginMeta = PretixPluginMeta
+
+    def ready(self):
+        from . import signals  # NOQA
