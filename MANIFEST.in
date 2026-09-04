@@ -1,0 +1,3 @@
+include pretix_satspay/templates/pretix_satspay/*.html
+include LICENSE
+include README.md

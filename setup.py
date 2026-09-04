@@ -1,4 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 setup(
     name="pretix-satspay",
@@ -16,7 +16,7 @@ The customer pays on the Satspay payment page hosted by your LNbits instance. A 
     url="https://github.com/dadofsambonzuki/pretix-satspay",
     license="MIT",
     install_requires=["django>=4", "i18nfield>=0.6", "requests>=2"],
-    packages=find_packages(exclude=["tests", "tests.*"]),
+    packages=find_namespace_packages(exclude=["tests", "tests.*"]),
     include_package_data=True,
     package_data={
         "pretix_satspay": ["templates/pretix_satspay/*.html"],
