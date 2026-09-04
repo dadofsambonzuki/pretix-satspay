@@ -163,7 +163,23 @@ class Satspay(BasePaymentProvider):
     def checkout_prepare(self, request, cart) -> bool:
         return True
 
-    def execute_payment(self, request, payment: OrderPayment):
+    def _charge(self, payment: OrderPayment):
+        """
+        Return the charge_id currently stored on the payment, creating a new
+        charge on demand if none exists yet.
+
+        pretix sends the order-placed (and payment reminder) emails before it
+        calls ``execute_payment``, so at email render time the payment has not
+        had a charge created for it yet. Creating it lazily here guarantees the
+        payment link embedded in those emails is always valid instead of
+        degrading to a broken ``/satspay/None`` URL.
+        """
+        charge_id = payment.info_data.get("charge_id")
+        if charge_id:
+            return charge_id
+        return self._create_charge(payment)
+
+    def _create_charge(self, payment: OrderPayment):
         webhook_url = build_absolute_uri(
             self.event,
             "plugins:pretix_satspay:webhook",
@@ -210,24 +226,46 @@ class Satspay(BasePaymentProvider):
             "pretix_satspay.charge.created",
             data={"charge_id": charge["id"]},
         )
-        return self.client.charge_page_url(charge["id"])
+        return charge["id"]
+
+    def execute_payment(self, request, payment: OrderPayment):
+        charge_id = self._charge(payment)
+        return self.client.charge_page_url(charge_id)
 
     def payment_pending_render(self, request, payment: OrderPayment) -> str:
         template = get_template("pretix_satspay/pending.html")
-        charge_id = payment.info_data.get("charge_id")
         ctx = {
             "request": request,
             "event": self.event,
             "settings": self.settings,
             "order": payment.order,
             "payment": payment,
-            "charge_link": self.client.charge_page_url(charge_id),
-            "status_url": self.client.charge_public_status_url(charge_id),
         }
+        if payment.state in (
+            OrderPayment.PAYMENT_STATE_CREATED,
+            OrderPayment.PAYMENT_STATE_PENDING,
+        ):
+            try:
+                charge_id = self._charge(payment)
+            except PaymentException:
+                charge_id = payment.info_data.get("charge_id")
+            ctx["charge_link"] = self.client.charge_page_url(charge_id) if charge_id else None
+            ctx["status_url"] = self.client.charge_public_status_url(charge_id) if charge_id else None
+        else:
+            ctx["charge_link"] = None
+            ctx["status_url"] = None
         return template.render(ctx)
 
     def order_pending_mail_render(self, order, payment: OrderPayment) -> str:
-        charge_id = payment.info_data.get("charge_id")
+        try:
+            charge_id = self._charge(payment)
+        except PaymentException:
+            charge_id = payment.info_data.get("charge_id")
+        if not charge_id:
+            return _(
+                "Your Bitcoin / Lightning payment is still being prepared. "
+                "Please return to your order and choose how to pay."
+            )
         return _("To pay for your order, please visit the following page: {url}").format(
             url=self.client.charge_page_url(charge_id)
         )
