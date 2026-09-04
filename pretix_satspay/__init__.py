@@ -7,9 +7,9 @@ except ImportError:
 
 
 class PretixPluginMeta:
-    name = "pretix Satspay"
+    name = "LNBits SatsPay Server"
     author = "Nathan Day"
-    description = "Pay with Bitcoin (Lightning / on-chain) via the LNbits Satspay extension"
+    description = "Pay with Bitcoin (Lightning / on-chain) via the LNBits Satspay extension"
     visible = True
     version = __version__
     category = "PAYMENT"

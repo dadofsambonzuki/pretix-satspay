@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class Satspay(BasePaymentProvider):
     identifier = "satspay"
-    verbose_name = _("Satspay (Bitcoin / Lightning)")
+    verbose_name = _("LNBits SatsPay Server")
     execute_payment_needs_user = True
     abort_pending_allowed = True
 

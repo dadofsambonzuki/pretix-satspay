@@ -5,7 +5,7 @@ from . import PretixPluginMeta
 
 class SatspayAppConfig(PluginConfig):
     name = 'pretix_satspay'
-    verbose_name = 'pretix Satspay'
+    verbose_name = 'LNBits SatsPay Server'
     default = True
 
     PretixPluginMeta = PretixPluginMeta
