@@ -1,0 +1,15 @@
+{% load i18n %}
+{% if charge_id %}
+    <dl class="dl-horizontal">
+        <dt>{% trans "Satspay charge" %}</dt>
+        <dd>{{ charge_id }}</dd>
+        {% if status %}
+            <dt>{% trans "Amount" %}</dt>
+            <dd>{{ status.amount }} sats</dd>
+            <dt>{% trans "Paid" %}</dt>
+            <dd>{% if status.paid %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</dd>
+        {% endif %}
+    </dl>
+{% else %}
+    <p>{% trans "No Satspay charge has been created for this payment yet." %}</p>
+{% endif %}
