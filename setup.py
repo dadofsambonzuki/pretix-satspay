@@ -18,6 +18,9 @@ The customer pays on the Satspay payment page hosted by your LNbits instance. A 
     install_requires=["django>=4", "i18nfield>=0.6", "requests>=2"],
     packages=find_packages(exclude=["tests", "tests.*"]),
     include_package_data=True,
+    package_data={
+        "pretix_satspay": ["templates/pretix_satspay/*.html"],
+    },
     entry_points="""
 [pretix.plugin]
 pretix_satspay=pretix_satspay:PretixPluginMeta
